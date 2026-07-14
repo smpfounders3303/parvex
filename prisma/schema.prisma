@@ -1,0 +1,493 @@
+// PARVEX — Production database schema
+// Domains: Auth (Better Auth) · CMS (Projects/Services/PageContent) · Media
+// Business (Contact/Leads) · Growth (Analytics) · System (Settings/Audit)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------------
+// AUTH — Better Auth core tables + PARVEX role extension.
+// Auth exists ONLY for /admin. There is no public registration.
+// ---------------------------------------------------------------------------
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  EDITOR
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  role          Role      @default(EDITOR)
+  disabled      Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions Session[]
+  accounts Account[]
+
+  auditLogs  AuditLog[]
+  leadNotes  LeadNote[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  idToken               String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verification")
+}
+
+// ---------------------------------------------------------------------------
+// MEDIA — Cloudinary-backed. Never store binaries in Postgres or Git.
+// ---------------------------------------------------------------------------
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
+enum MediaCategory {
+  PROJECT
+  PHOTOGRAPHY
+  SERVICE
+  BRAND
+  ATTACHMENT
+  GENERAL
+}
+
+model Media {
+  id         String        @id @default(cuid())
+  type       MediaType
+  category   MediaCategory @default(GENERAL)
+  provider   String        @default("cloudinary")
+  publicId   String        @unique // provider asset id — needed to delete/transform
+  url        String
+  filename   String
+  mimeType   String
+  width      Int?
+  height     Int?
+  bytes      Int
+  altText    String?
+  title      String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  projectCover      Project[]           @relation("ProjectCover")
+  projectThumbnail  Project[]           @relation("ProjectThumbnail")
+  projectGallery    ProjectGalleryImage[]
+  serviceMedia      Service[]           @relation("ServiceMedia")
+  contactAttachment ContactAttachment[]
+
+  @@index([category])
+  @@index([type])
+}
+
+// ---------------------------------------------------------------------------
+// CMS — Projects (full case-study system)
+// ---------------------------------------------------------------------------
+
+enum ProjectStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ProjectClientType {
+  CLIENT
+  INTERNAL
+}
+
+enum ProjectDeliveryStatus {
+  LIVE
+  IN_PROGRESS
+  CONCEPT
+}
+
+model Project {
+  id          String            @id @default(cuid())
+  slug        String            @unique
+  title       String
+  category    String
+  year        String
+  clientType  ProjectClientType @default(CLIENT)
+  clientName  String?
+  deliveryStatus ProjectDeliveryStatus @default(LIVE)
+  duration    String?
+
+  description String
+
+  coverImageId     String?
+  coverImage       Media?  @relation("ProjectCover", fields: [coverImageId], references: [id])
+  thumbnailId      String?
+  thumbnail        Media?  @relation("ProjectThumbnail", fields: [thumbnailId], references: [id])
+  videoUrl         String?
+
+  services String[] // service titles/slugs shown on the case study
+
+  challenge   String?
+  solution    String?
+  research    String?
+  development String?
+  outcome     String?
+
+  technology ProjectTechnology[]
+  gallery    ProjectGalleryImage[]
+  results    ProjectResult[]
+
+  featured     Boolean       @default(false)
+  displayOrder Int           @default(0)
+
+  status      ProjectStatus @default(DRAFT)
+  publishedAt DateTime?
+
+  metaTitle       String?
+  metaDescription String?
+  ogImageId       String?
+  canonicalUrl    String?
+  noIndex         Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([featured])
+  @@index([displayOrder])
+}
+
+model ProjectTechnology {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  category  String
+  order     Int     @default(0)
+
+  @@index([projectId])
+}
+
+model ProjectGalleryImage {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  mediaId   String
+  media     Media   @relation(fields: [mediaId], references: [id])
+  aspect    String  @default("landscape") // landscape | portrait | square
+  order     Int     @default(0)
+
+  @@index([projectId])
+}
+
+model ProjectResult {
+  id          String  @id @default(cuid())
+  projectId   String
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  metric      String
+  value       String
+  description String
+  order       Int     @default(0)
+
+  @@index([projectId])
+}
+
+// ---------------------------------------------------------------------------
+// CMS — Services
+// ---------------------------------------------------------------------------
+
+model Service {
+  id              String  @id @default(cuid())
+  slug            String  @unique // controls public anchor IDs — must stay stable
+  number          String
+  title           String
+  description     String
+  longDescription String?
+  deliverables    String[]
+  outcome         String?
+
+  mediaId String?
+  media   Media?  @relation("ServiceMedia", fields: [mediaId], references: [id])
+
+  order     Int     @default(0)
+  published Boolean @default(true)
+
+  metaTitle       String?
+  metaDescription String?
+  ogImageId       String?
+  keywords        String[]
+  canonicalUrl    String?
+  noIndex         Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([published])
+  @@index([order])
+}
+
+// ---------------------------------------------------------------------------
+// CMS — Structured page content (not a page builder — fixed safe fields)
+// ---------------------------------------------------------------------------
+
+enum PageKey {
+  HOMEPAGE
+  WORK
+  SERVICES
+  ABOUT
+  CONTACT
+}
+
+model PageContent {
+  id   String  @id @default(cuid())
+  page PageKey @unique
+
+  heroEyebrow        String?
+  heroHeadline       String?
+  heroSupportingCopy String?
+  primaryCtaLabel    String?
+  primaryCtaLink     String?
+
+  selectedWorkHeading  String?
+  servicesHeading      String?
+  photographyHeading   String?
+
+  finalCtaHeadline String?
+  finalCtaLabel    String?
+  finalCtaLink     String?
+
+  metaTitle       String?
+  metaDescription String?
+  ogImageUrl      String?
+  canonicalUrl    String?
+  noIndex         Boolean @default(false)
+
+  // Genuinely flexible, page-specific extras that don't warrant their own
+  // column — intentionally small and additive, never a substitute for the
+  // typed fields above.
+  extra Json?
+
+  updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// BUSINESS — Contact, Leads
+// ---------------------------------------------------------------------------
+
+enum MessageStatus {
+  UNREAD
+  READ
+  REPLIED
+  ARCHIVED
+}
+
+enum NotificationState {
+  PENDING
+  SENT
+  FAILED
+}
+
+model ContactMessage {
+  id          String        @id @default(cuid())
+  name        String
+  email       String
+  company     String?
+  projectType String
+  timeline    String
+  budget      String?
+  message     String
+  status      MessageStatus @default(UNREAD)
+
+  notificationState NotificationState @default(PENDING)
+  notificationError String?
+
+  ipAddress String?
+
+  attachments ContactAttachment[]
+  lead        Lead?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ContactAttachment {
+  id        String         @id @default(cuid())
+  messageId String
+  message   ContactMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  mediaId   String
+  media     Media          @relation(fields: [mediaId], references: [id])
+  createdAt DateTime       @default(now())
+
+  @@index([messageId])
+}
+
+enum LeadStage {
+  NEW
+  QUALIFIED
+  DISCUSSION
+  PROPOSAL
+  WON
+  LOST
+}
+
+model Lead {
+  id               String    @id @default(cuid())
+  name             String
+  company          String?
+  email            String
+  phone            String?
+  serviceInterest  String?
+  estimatedBudget  String?
+  stage            LeadStage @default(NEW)
+  source           String?
+
+  sourceMessageId String?         @unique
+  sourceMessage   ContactMessage? @relation(fields: [sourceMessageId], references: [id])
+
+  notes LeadNote[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([stage])
+  @@index([email])
+}
+
+model LeadNote {
+  id        String   @id @default(cuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+}
+
+// ---------------------------------------------------------------------------
+// GROWTH — Analytics (truthful first-party events + provider configuration)
+// ---------------------------------------------------------------------------
+
+enum AnalyticsEventType {
+  CONTACT_ENQUIRY_CREATED
+  PROJECT_VIEWED
+  PROJECT_CTA_CLICKED
+  SERVICE_CTA_CLICKED
+}
+
+model AnalyticsEvent {
+  id        String             @id @default(cuid())
+  type      AnalyticsEventType
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime           @default(now())
+
+  @@index([type])
+  @@index([createdAt])
+}
+
+model AnalyticsConfig {
+  id                      String  @id @default("singleton")
+  googleAnalyticsId       String?
+  vercelAnalyticsEnabled  Boolean @default(false)
+  microsoftClarityId      String?
+  updatedAt               DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// SYSTEM — Settings, Audit Log
+// ---------------------------------------------------------------------------
+
+model Setting {
+  id   String @id @default("singleton")
+
+  companyName        String  @default("Parvex")
+  tagline             String?
+  primaryEmail        String?
+  contactEmail        String?
+
+  availabilityStatus  String? // e.g. "Available for new projects"
+  responseTime        String? // e.g. "Within 24 hours"
+
+  linkedin  String?
+  instagram String?
+  github    String?
+
+  logoUrl          String?
+  symbolUrl        String?
+  faviconUrl       String?
+  defaultOgImageUrl String?
+
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorName  String // denormalized so history survives user deletion
+  action     String // e.g. "PROJECT_PUBLISHED", "USER_ROLE_CHANGED"
+  entityType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
