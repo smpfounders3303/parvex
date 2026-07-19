@@ -8,7 +8,7 @@ import { getSessionCookie } from "better-auth/cookies";
 // proxy alone; it exists to bounce obviously-unauthenticated requests
 // before they render anything.
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const response = NextResponse.next();
