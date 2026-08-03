@@ -86,7 +86,7 @@ export function Hero({
           className="relative w-full aspect-[16/9] md:aspect-[21/9] rounded-t-[20px] overflow-hidden bg-[#F7F7F7] image-hover-zoom"
         >
           <Image
-            src="/assets/work/hero-visual.png"
+            src="/assets/work/"
             alt="Parvex studio — digital experiences crafted with precision"
             fill
             priority
