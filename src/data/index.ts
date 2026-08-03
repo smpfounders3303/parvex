@@ -1,0 +1,10 @@
+export { PROJECTS, getProjectBySlug, getNextProject, getAllProjectSlugs, getFeaturedProjects, FEATURED_PROJECTS } from "./projects";
+export { SERVICES } from "./services";
+export { PHOTOGRAPHY } from "./photography";
+export { VIDEOGRAPHY } from "./videography";
+export { TEAM } from "./team";
+export { TESTIMONIALS } from "./testimonials";
+export { FAQ } from "./faq";
+export { TECHNOLOGIES } from "./technologies";
+export { COMPANY } from "./company";
+export { SOCIAL_LINKS } from "./social";

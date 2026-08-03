@@ -1,0 +1,460 @@
+@import "tailwindcss";
+
+/* ============================================================
+   PARVEX — GLOBAL STYLES + ANIMATION SYSTEM
+   Design System v2.0 — Phase 2: Motion
+   ============================================================ */
+
+/* --- CSS Custom Properties / Design Tokens ----------------- */
+:root {
+  --color-bg: #ffffff;
+  --color-dark: #0a0a0a;
+  --color-gray: #6b6b6b;
+  --color-border: #e8e8e8;
+  --color-surface: #f7f7f7;
+
+  /* Admin-only restrained accent — not used anywhere in the public site. */
+  --color-admin-gold: #a9812f;
+  --color-admin-gold-soft: #f4ecdc;
+
+  --font-primary: system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --radius-pill: 9999px;
+
+  /* Animation tokens */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --duration-fast: 240ms;
+  --duration-base: 380ms;
+  --duration-slow: 600ms;
+  --duration-slower: 900ms;
+
+  --transition-base: 200ms ease-out;
+  --transition-smooth: 300ms ease-out;
+  --transition-slow: 500ms ease-out;
+}
+
+/* --- Base layer -------------------------------------------- */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    font-family: var(--font-primary);
+    background-color: var(--color-bg);
+    color: var(--color-dark);
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* Respect reduced motion — kill all animations */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+
+    /* Force reveal all animated elements */
+    [data-reveal],
+    [data-reveal-child],
+    [data-hero] {
+      opacity: 1 !important;
+      transform: none !important;
+      clip-path: none !important;
+    }
+  }
+
+  :focus-visible {
+    outline: 2px solid #0a0a0a;
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background-color: #0a0a0a;
+    color: #ffffff;
+  }
+
+  img,
+  video {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .skip-link {
+    position: absolute;
+    top: -100%;
+    left: 1rem;
+    z-index: 100;
+    background: #0a0a0a;
+    color: #ffffff;
+    padding: 0.5rem 1rem;
+    border-radius: 0 0 8px 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: top 0.2s;
+  }
+
+  .skip-link:focus {
+    top: 0;
+  }
+}
+
+/* ============================================================
+   ANIMATION SYSTEM
+   ============================================================
+
+   Philosophy:
+   - All animations use transform + opacity only (GPU composited)
+   - data-reveal: element waits for IntersectionObserver to add data-revealed
+   - data-hero: element waits for useHeroAnimation to add data-hero-ready
+   - Variants via data-reveal-type="slide-up|slide-left|fade|scale|clip"
+   - No layout-triggering properties (no width/height/margin animation)
+
+   ============================================================ */
+
+/* --- Hero animation system --------------------------------- */
+
+/* All hero elements start hidden */
+[data-hero] {
+  opacity: 0;
+  will-change: opacity, transform;
+}
+
+/* Eyebrow — slide right + fade */
+[data-hero="eyebrow"] {
+  transform: translateX(-12px);
+  transition:
+    opacity var(--duration-slow) var(--ease-out-expo),
+    transform var(--duration-slow) var(--ease-out-expo);
+}
+
+/* Headline words — clip reveal from bottom */
+[data-hero="h1-line"] {
+  display: block;
+  overflow: hidden;
+}
+
+[data-hero="h1-line"] > span {
+  display: block;
+  transform: translateY(110%);
+  transition:
+    opacity var(--duration-slower) var(--ease-out-expo),
+    transform var(--duration-slower) var(--ease-out-expo);
+  opacity: 1; /* child span inherits parent opacity? no — use translateY clip */
+}
+
+/* For h1-line, we animate the parent opacity + the inner span's translateY */
+[data-hero="h1-line"] {
+  opacity: 1 !important; /* container always visible, clip via overflow */
+}
+
+[data-hero="h1-line"][data-hero-ready="true"] > span {
+  transform: translateY(0);
+}
+
+/* Subtext — fade up */
+[data-hero="subtext"] {
+  transform: translateY(18px);
+  transition:
+    opacity var(--duration-slower) var(--ease-out-expo),
+    transform var(--duration-slower) var(--ease-out-expo);
+}
+
+/* CTAs — fade up */
+[data-hero="ctas"] {
+  transform: translateY(14px);
+  transition:
+    opacity var(--duration-slow) var(--ease-out-expo),
+    transform var(--duration-slow) var(--ease-out-expo);
+}
+
+/* Hero image — scale up from 98% + fade */
+[data-hero="image"] {
+  transform: scale(0.98) translateY(16px);
+  transition:
+    opacity var(--duration-slower) var(--ease-out-quart),
+    transform var(--duration-slower) var(--ease-out-quart);
+}
+
+/* Ready state — all hero elements */
+[data-hero="eyebrow"][data-hero-ready="true"],
+[data-hero="subtext"][data-hero-ready="true"],
+[data-hero="ctas"][data-hero-ready="true"],
+[data-hero="image"][data-hero-ready="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+/* --- Scroll reveal system ---------------------------------- */
+
+/* Base state — hidden before reveal */
+[data-reveal] {
+  will-change: opacity, transform;
+}
+
+/* Default: fade up */
+[data-reveal]:not([data-reveal-type]) {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity var(--duration-slower) var(--ease-out-expo),
+    transform var(--duration-slower) var(--ease-out-expo);
+}
+
+/* Variant: fade only */
+[data-reveal][data-reveal-type="fade"] {
+  opacity: 0;
+  transition: opacity var(--duration-slower) var(--ease-out-expo);
+}
+
+/* Variant: slide left */
+[data-reveal][data-reveal-type="slide-left"] {
+  opacity: 0;
+  transform: translateX(-20px);
+  transition:
+    opacity var(--duration-slower) var(--ease-out-expo),
+    transform var(--duration-slower) var(--ease-out-expo);
+}
+
+/* Variant: slide right */
+[data-reveal][data-reveal-type="slide-right"] {
+  opacity: 0;
+  transform: translateX(20px);
+  transition:
+    opacity var(--duration-slower) var(--ease-out-expo),
+    transform var(--duration-slower) var(--ease-out-expo);
+}
+
+/* Variant: scale */
+[data-reveal][data-reveal-type="scale"] {
+  opacity: 0;
+  transform: scale(0.96);
+  transition:
+    opacity var(--duration-slower) var(--ease-out-expo),
+    transform var(--duration-slower) var(--ease-out-expo);
+}
+
+/* Variant: clip (image reveal from bottom edge) */
+[data-reveal][data-reveal-type="clip"] {
+  opacity: 0;
+  transform: scale(1.02);
+  transition:
+    opacity var(--duration-slower) var(--ease-out-quart),
+    transform var(--duration-slower) var(--ease-out-quart);
+}
+
+/* Child stagger items — same states as default */
+[data-reveal-child] {
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity var(--duration-slower) var(--ease-out-expo),
+    transform var(--duration-slower) var(--ease-out-expo);
+  will-change: opacity, transform;
+}
+
+[data-reveal-child][data-reveal-type="fade"] {
+  transform: none;
+}
+
+[data-reveal-child][data-reveal-type="slide-left"] {
+  transform: translateX(-16px);
+}
+
+/* Revealed state — all variants */
+[data-reveal][data-revealed="true"],
+[data-reveal-child][data-revealed="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+/* --- Micro-interaction: Button hover ----------------------- */
+
+/* Scale + subtle shadow lift on hover */
+.btn-interactive {
+  transition:
+    background-color var(--duration-fast) ease-out,
+    color var(--duration-fast) ease-out,
+    border-color var(--duration-fast) ease-out,
+    transform var(--duration-fast) var(--ease-spring),
+    box-shadow var(--duration-fast) ease-out !important;
+}
+
+.btn-interactive:hover {
+  transform: scale(1.02);
+}
+
+.btn-interactive:active {
+  transform: scale(0.98);
+  transition-duration: 80ms !important;
+}
+
+/* --- Micro-interaction: Card hover ------------------------- */
+
+.card-interactive {
+  transition:
+    transform var(--duration-base) var(--ease-out-expo),
+    box-shadow var(--duration-base) var(--ease-out-expo);
+}
+
+.card-interactive:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 40px rgba(10, 10, 10, 0.08);
+}
+
+/* --- Micro-interaction: Nav link underline ----------------- */
+
+.nav-link-animated {
+  position: relative;
+}
+
+.nav-link-animated::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background-color: currentColor;
+  transition: width var(--duration-base) var(--ease-out-expo);
+}
+
+.nav-link-animated:hover::after {
+  width: 100%;
+}
+
+/* --- Micro-interaction: Image zoom on hover ---------------- */
+
+.image-hover-zoom {
+  overflow: hidden;
+}
+
+.image-hover-zoom img {
+  transition: transform var(--duration-slower) var(--ease-out-quart) !important;
+  will-change: transform;
+}
+
+.image-hover-zoom:hover img {
+  transform: scale(1.025) !important;
+}
+
+/* --- Project card hover — premium -------------------------  */
+
+.project-card-overlay {
+  transition: background-color 500ms ease-out;
+}
+
+.project-card-arrow {
+  transition:
+    opacity var(--duration-base) ease-out,
+    transform var(--duration-base) var(--ease-out-expo);
+}
+
+/* --- Service row hover ------------------------------------- */
+
+.service-row {
+  transition: background-color var(--duration-fast) ease-out;
+}
+
+.service-row:hover {
+  background-color: rgba(10, 10, 10, 0.015);
+}
+
+/* --- Navbar entrance --------------------------------------- */
+
+[data-nav-ready="false"] {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+[data-nav-ready="true"] {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 500ms var(--ease-out-expo) 80ms,
+    transform 500ms var(--ease-out-expo) 80ms;
+}
+
+/* --- Footer subtle reveal ---------------------------------- */
+
+[data-footer-col] {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity var(--duration-slower) var(--ease-out-expo),
+    transform var(--duration-slower) var(--ease-out-expo);
+}
+
+[data-footer-col][data-revealed="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+/* --- Media grid hover border pulse ------------------------- */
+
+.media-item {
+  transition:
+    transform var(--duration-base) var(--ease-out-expo),
+    box-shadow var(--duration-base) ease-out;
+}
+
+.media-item:hover {
+  transform: scale(1.01);
+  box-shadow: 0 8px 30px rgba(10, 10, 10, 0.12);
+  z-index: 1;
+}
+
+/* --- Utility layer ----------------------------------------- */
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ─── Case Study + Work page utilities ────────────────────────────────────── */
+
+/* Image hover zoom — subtle scale on parent hover, GPU-composited */
+.image-hover-zoom img {
+  transition: transform var(--duration-slow) var(--ease-out-quart);
+  will-change: transform;
+}
+.image-hover-zoom:hover img {
+  transform: scale(1.025);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image-hover-zoom img {
+    transition: none;
+  }
+  .image-hover-zoom:hover img {
+    transform: none;
+  }
+}
